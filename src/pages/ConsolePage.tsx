@@ -26,6 +26,7 @@ import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
+import { RolePlayService } from '../services/RolePlayService';
 
 /**
  * Type for result from get_weather() function call
@@ -125,6 +126,25 @@ export function ConsolePage() {
   });
   const [marker, setMarker] = useState<Coordinates | null>(null);
 
+  const [selectedScenario, setSelectedScenario] = useState('default');
+
+  const rolePlayServiceRef = useRef<RolePlayService>(new RolePlayService());
+
+  const changeScenario = useCallback((scenario: string) => {
+    const rolePlayService = rolePlayServiceRef.current;
+    const client = clientRef.current;
+    
+    // Update the scenario
+    rolePlayService.setScenario(scenario);
+    
+    // Update the client instructions
+    client.updateSession({ 
+      instructions: rolePlayService.OWNER_PROMPT 
+    });
+    
+    setSelectedScenario(scenario);
+  }, []);
+
   /**
    * Utility for formatting the timing of logs
    */
@@ -166,6 +186,7 @@ export function ConsolePage() {
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
+    const rolePlayService = rolePlayServiceRef.current;
 
     // Set state variables
     startTimeRef.current = new Date().toISOString();
@@ -181,11 +202,12 @@ export function ConsolePage() {
 
     // Connect to realtime API
     await client.connect();
+    
+    // Initialize role play with a greeting
     client.sendUserMessageContent([
       {
-        type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        type: 'input_text',
+        text: 'Hello, I am ready to start the role play scenario.',
       },
     ]);
 
@@ -375,11 +397,17 @@ export function ConsolePage() {
     // Get refs
     const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
+    const rolePlayService = rolePlayServiceRef.current;
 
-    // Set instructions
-    client.updateSession({ instructions: instructions });
+    // Set instructions with our role play prompt
+    client.updateSession({ 
+      instructions: rolePlayService.OWNER_PROMPT 
+    });
+    
     // Set transcription, otherwise we don't get user transcriptions back
-    client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
+    client.updateSession({ 
+      input_audio_transcription: { model: 'whisper-1' } 
+    });
 
     // Add tools
     client.addTool(
@@ -520,6 +548,18 @@ export function ConsolePage() {
               onClick={() => resetAPIKey()}
             />
           )}
+        </div>
+        <div className="content-scenario-select">
+          <select 
+            value={selectedScenario}
+            onChange={(e) => changeScenario(e.target.value)}
+            disabled={isConnected}
+          >
+            <option value="default">Default Scenario</option>
+            <option value="motivated">Motivated Seller</option>
+            <option value="unmotivated">Unmotivated Seller</option>
+            <option value="busy">Busy Owner</option>
+          </select>
         </div>
       </div>
       <div className="content-main">
